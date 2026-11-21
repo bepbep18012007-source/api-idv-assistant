@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Api · Identity V Tactical Assistant v0.2</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1020;--panel:#141c30;--line:#263550;--muted:#9eacc4;--text:#edf3ff;--accent:#7c9cff;--good:#64d6a1;--warn:#ffca72;--bad:#ff7d8d}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#172443,var(--bg) 55%);color:var(--text);font:15px/1.5 system-ui,Segoe UI,sans-serif}
+main{max-width:1180px;margin:auto;padding:24px}.top{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+h1{font-size:28px;margin:0}.sub,.muted{color:var(--muted)}.tag{border:1px solid var(--line);border-radius:999px;padding:5px 10px;color:#b8c8ff;font-size:12px}
+.grid{display:grid;grid-template-columns: minmax(280px,360px) 1fr;gap:16px;margin-top:18px}
+.panel{background:linear-gradient(160deg,#17223a,#11192a);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 12px 35px #0003}
+h2{font-size:17px;margin:0 0 12px}label{display:block;color:#c5d0e3;font-size:13px;margin:10px 0 5px}
+input,select,textarea{width:100%;border:1px solid #344663;background:#0c1425;color:var(--text);border-radius:9px;padding:10px;font:inherit}
+textarea{min-height:72px;resize:vertical}.buttons{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+button{border:0;border-radius:10px;padding:10px 14px;font-weight:650;background:var(--accent);color:#091126;cursor:pointer}
+button.secondary{background:#273651;color:var(--text);border:1px solid #405373}button.danger{background:#5a2634;color:#ffe5e9}
+button:disabled{opacity:.45;cursor:not-allowed}
+video{width:100%;background:#050812;border-radius:12px;max-height:340px;object-fit:contain}
+.statrow{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.stat{padding:8px 10px;border:1px solid var(--line);border-radius:10px;font-size:12px;color:var(--muted)}
+#status{font-weight:650;color:var(--warn)}#advice{white-space:pre-wrap;min-height:160px;background:#0b1323;border:1px solid var(--line);border-radius:12px;padding:14px}
+.event{border-bottom:1px solid #263550;padding:8px 0;font-size:13px}.event:last-child{border:0}
+.small{font-size:12px;color:var(--muted)}.warning{border-left:3px solid var(--warn);padding:8px 12px;background:#332a1c66;border-radius:8px;margin-top:12px}
+footer{margin-top:18px;color:var(--muted);font-size:12px}
+@media(max-width:800px){.grid{grid-template-columns:1fr}main{padding:14px}}
+</style>
+</head>
+<body><main>
+<div class="top"><div><h1>Api <span class="tag">Identity V · v0.2 Cloud</span></h1><div class="sub">Trợ lý chiến thuật quan sát màn hình · không tự điều khiển nhân vật</div></div><span class="tag">Knowledge System v1.0 · preserved</span></div>
+<div class="statrow"><span class="stat">Stream: lấy 1 khung hình / 10 giây</span><span class="stat">AI: Cloudflare Workers AI</span><span class="stat">Voice: trình duyệt</span></div>
+<div class="grid">
+<section class="panel">
+<h2>1. Cấu hình trận đấu</h2>
+<label>Chế độ chơi</label><select id="mode"><option value="survivor">Survivor Mode</option><option value="hunter">Hunter Mode</option></select>
+<label>Map (nhập nếu đã xác định)</label><input id="map" placeholder="Ví dụ: Lakeside Village">
+<label>Nhân vật của bạn</label><input id="player" placeholder="Tên Survivor / Hunter">
+<label>Nhân vật đối phương đã xác định</label><input id="opponent" placeholder="Để trống nếu chưa rõ">
+<label>Thông tin trận đấu đã xác nhận</label><textarea id="context" placeholder="Ví dụ: 3 máy còn, 1 đồng đội đang treo ghế, tôi đang giải máy gần cổng..."></textarea>
+<label>Ghi chú quan sát thủ công (tùy chọn)</label><textarea id="notes" placeholder="Vị trí cuối cùng, hành động vừa thấy, tiến độ máy nếu biết..."></textarea>
+<div class="buttons"><button id="save">Lưu thông tin trận</button><button class="secondary" id="clear">Xóa bộ nhớ trận</button></div>
+<hr style="border-color:#263550;margin:16px 0">
+<h2>2. Quan sát màn hình</h2>
+<video id="preview" autoplay muted playsinline></video>
+<div class="buttons"><button id="start">Chia sẻ màn hình</button><button class="danger" id="stop" disabled>Dừng quan sát</button></div>
+<div class="small" id="screenState">Chưa chia sẻ màn hình. Bạn phải tự chọn cửa sổ game trong hộp thoại của trình duyệt.</div>
+<label>Khoảng cách giữa các lần phân tích</label><select id="interval"><option value="10">10 giây · tiết kiệm</option><option value="15">15 giây · rất tiết kiệm</option><option value="30">30 giây · cực tiết kiệm</option></select>
+<div class="warning">Api chỉ gửi ảnh chụp khung hình, không gửi âm thanh game. Không phân tích mọi frame liên tục. Tab cần được mở trong lúc chơi.</div>
+</section>
+<section class="panel">
+<h2>3. Phân tích và chỉ dẫn trực tiếp</h2>
+<div class="statrow"><span class="stat" id="apiState">AI: chưa kết nối</span><span class="stat" id="frameState">Chưa có khung hình</span><span class="stat" id="lastState">Chưa phân tích</span></div>
+<div id="status">Đang chờ bạn chia sẻ màn hình</div>
+<div id="advice">Khi bạn bắt đầu chia sẻ màn hình, Api sẽ gửi khung hình theo chu kỳ đã chọn đến máy chủ cloud để nhận diện. Đây là bản thử nghiệm nhận diện hình ảnh; các vị trí, tiến độ cipher và trạng thái nhân vật vẫn cần kiểm tra lại bằng mắt.</div>
+<div class="buttons"><button id="analyzeNow" class="secondary" disabled>Phân tích ngay</button><button id="voice" class="secondary">Bật giọng nói</button><button id="clearLog" class="secondary">Xóa nhật ký</button></div>
+<h2 style="margin-top:20px">4. Nhật ký trận đấu</h2><div id="log"><div class="small">Chưa có sự kiện.</div></div>
+<footer>Phân biệt: Quan sát trực tiếp ≠ suy luận ≠ giả thuyết. Api không biết thông tin ẩn nếu không có bằng chứng trên màn hình. Không dùng chỉ dẫn này thay thế quyết định của người chơi.</footer>
+</section></div>
+</main>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const fields = ["mode","map","player","opponent","context","notes"];
+let stream=null, timer=null, busy=false, voiceEnabled=false, lastAdvice="", lastFrameAt=0;
+const KEY="api_idv_v02_match";
+function load(){try{const v=JSON.parse(localStorage.getItem(KEY)||"{}");fields.forEach(k=>{if(v[k]!==undefined)$(k).value=v[k]})}catch{}}
+function save(){const v={};fields.forEach(k=>v[k]=$(k).value);localStorage.setItem(KEY,JSON.stringify(v));log("Đã lưu thông tin trận trên trình duyệt.");}
+function log(s){const d=document.createElement("div");d.className="event";d.textContent=new Date().toLocaleTimeString()+" · "+s;const box=$("log");if(box.querySelector(".small"))box.innerHTML="";box.prepend(d);}
+function say(s){if(!voiceEnabled||!("speechSynthesis"in window))return; speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(s.slice(0,260));u.lang="vi-VN";u.rate=1.05;speechSynthesis.speak(u);}
+function status(s){$("status").textContent=s}
+function dataURLBlob(dataURL){const [meta,b64]=dataURL.split(",");const mime=(meta.match(/data:(.*?);/)||[])[1]||"image/jpeg";const bin=atob(b64);const arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return new Blob([arr],{type:mime});}
+async function captureAndAnalyze(){
+ if(!stream||busy)return;const video=$("preview");if(video.readyState<2)return;
+ busy=true;$("analyzeNow").disabled=true;status("Đang gửi khung hình lên cloud để phân tích…");
+ try{
+  const canvas=document.createElement("canvas");const scale=Math.min(1,960/video.videoWidth);canvas.width=Math.round(video.videoWidth*scale);canvas.height=Math.round(video.videoHeight*scale);
+  const ctx=canvas.getContext("2d");ctx.drawImage(video,0,0,canvas.width,canvas.height);
+  const data=canvas.toDataURL("image/jpeg",0.68);$("frameState").textContent="Đã chụp "+new Date().toLocaleTimeString();
+  const body={image:data,mode:$("mode").value,map:$("map").value,player:$("player").value,opponent:$("opponent").value,matchContext:$("context").value,manualNotes:$("notes").value,previousAdvice:lastAdvice};
+  const res=await fetch("/api/analyze",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+  const payload=await res.json();if(!res.ok)throw new Error(payload.error||"Lỗi máy chủ");
+  const advice=payload.analysis||"Không nhận được nội dung phân tích.";
+  $("advice").textContent=advice;$("lastState").textContent="Lúc "+new Date().toLocaleTimeString();$("apiState").textContent="AI: đã phản hồi";
+  status("Đã phân tích khung hình · hãy kiểm tra lại các chi tiết nhận diện.");
+  const changed=advice!==lastAdvice;lastAdvice=advice;if(changed){log("Api cập nhật phân tích mới.");say(advice);}
+ }catch(e){status("Không phân tích được: "+e.message);$("apiState").textContent="AI: lỗi / hết hạn mức";log("Lỗi: "+e.message);}
+ finally{busy=false;$("analyzeNow").disabled=!stream;}
+}
+async function start(){
+ if(!navigator.mediaDevices?.getDisplayMedia){status("Trình duyệt không hỗ trợ chia sẻ màn hình.");return}
+ try{
+  stream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:5},audio:false});
+  $("preview").srcObject=stream;$("start").disabled=true;$("stop").disabled=false;$("analyzeNow").disabled=false;
+  $("screenState").textContent="Đang chia sẻ. Bạn có thể dừng bất cứ lúc nào.";status("Đang quan sát màn hình.");
+  stream.getVideoTracks()[0].addEventListener("ended",stop);
+  await captureAndAnalyze();timer=setInterval(captureAndAnalyze,Number($("interval").value)*1000);
+  log("Bắt đầu chia sẻ màn hình.");
+ }catch(e){status("Bạn chưa cấp quyền chia sẻ màn hình: "+e.message)}
+}
+function stop(){if(timer)clearInterval(timer);timer=null;if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;$("preview").srcObject=null;$("start").disabled=false;$("stop").disabled=true;$("analyzeNow").disabled=true;$("screenState").textContent="Đã dừng chia sẻ.";status("Đã dừng quan sát.");log("Đã dừng chia sẻ màn hình.");}
+$("start").onclick=start;$("stop").onclick=stop;$("analyzeNow").onclick=captureAndAnalyze;
+$("save").onclick=save;$("clear").onclick=()=>{if(confirm("Xóa thông tin và bộ nhớ trận trên trình duyệt?")){localStorage.removeItem(KEY);fields.forEach(k=>$(k).value="");lastAdvice="";$("advice").textContent="Đã xóa bộ nhớ trận.";log("Đã xóa bộ nhớ trận.");}};
+$("voice").onclick=()=>{voiceEnabled=!voiceEnabled;$("voice").textContent=voiceEnabled?"Tắt giọng nói":"Bật giọng nói";if(voiceEnabled)say("Api đã bật thông báo giọng nói.");};
+$("clearLog").onclick=()=>{$("log").innerHTML='<div class="small">Đã xóa nhật ký.</div>'};
+$("interval").onchange=()=>{if(timer){clearInterval(timer);timer=setInterval(captureAndAnalyze,Number($("interval").value)*1000)}};
+window.addEventListener("beforeunload",stop);load();
+})();
+</script></body></html>
